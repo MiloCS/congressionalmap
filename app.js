@@ -1,9 +1,3 @@
-const map = L.map('map').setView([39.8283, -98.5795], 4);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-}).addTo(map);
-
 const states = [
     'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
     'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
@@ -11,6 +5,64 @@ const states = [
     'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
     'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
 ];
+
+const map = L.map('map', {
+    center: [39.8283, -98.5795],
+    zoom: 4,
+    minZoom: 3,
+    maxZoom: 10
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+}).addTo(map);
+
+async function loadStateBorders() {
+    try {
+        const statesGeoJSON = {
+            type: "FeatureCollection",
+            features: []
+        };
+        
+        for (const state of states) {
+            try {
+                const response = await fetch(
+                    `https://raw.githubusercontent.com/unitedstates/districts/gh-pages/states/${state}/shape.geojson`
+                );
+                if (response.ok) {
+                    const data = await response.json();
+                    data.features.forEach(f => {
+                        f.properties.abbreviation = state;
+                    });
+                    statesGeoJSON.features.push(...data.features);
+                }
+            } catch (e) {}
+        }
+        
+        if (statesGeoJSON.features.length > 0) {
+            L.geoJSON(statesGeoJSON, {
+                style: {
+                    fillColor: '#e2e8f0',
+                    fillOpacity: 0.3,
+                    color: '#718096',
+                    weight: 1
+                },
+                onEachFeature: (feature, layer) => {
+                    layer.on('click', () => {
+                        const state = feature.properties.abbreviation;
+                        if (state) {
+                            stateSelect.value = state;
+                            handleStateChange();
+                        }
+                    });
+                }
+            }).addTo(map);
+        }
+    } catch (error) {
+        console.error('Error loading state borders:', error);
+    }
+}
 
 const stateNames = {
     AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
@@ -39,6 +91,8 @@ let currentDistrict = null;
 let legislatorsCache = null;
 
 function init() {
+    loadStateBorders();
+    
     states.forEach(state => {
         const option = document.createElement('option');
         option.value = state;
@@ -95,14 +149,21 @@ async function loadLegislators() {
         );
         if (!response.ok) throw new Error('Failed to load legislators');
         const data = await response.json();
-        legislatorsCache = data.map(leg => ({
-            name: leg.name?.full_name || `${leg.name?.last}, ${leg.name?.first}`,
-            state: leg.state,
-            district: leg.district,
-            party: leg.party,
-            chamber: leg.type,
-            bioguide: leg.bioguide?.id
-        }));
+        const now = new Date().toISOString().split('T')[0];
+        
+        legislatorsCache = data.map(leg => {
+            const currentTerm = leg.terms?.find(t => t.start <= now && t.end >= now) || leg.terms?.[leg.terms.length - 1];
+            const isSenator = currentTerm?.type === 'sen';
+            return {
+                name: leg.name?.full_name || `${leg.name?.last}, ${leg.name?.first}`,
+                state: currentTerm?.state,
+                district: isSenator ? null : currentTerm?.district,
+                party: currentTerm?.party === 'Democrat' ? 'D' : currentTerm?.party === 'Republican' ? 'R' : 'I',
+                chamber: isSenator ? 'senator' : 'rep',
+                bioguide: leg.id?.bioguide
+            };
+        }).filter(leg => leg.state);
+        
         return legislatorsCache;
     } catch (error) {
         console.error('Error loading legislators:', error);
@@ -181,32 +242,37 @@ async function searchDistrict() {
     const state = stateSelect.value;
     const district = districtSelect.value;
 
-    if (!state || !district) {
-        alert('Please select a state and district');
+    if (!state) {
+        alert('Please select a state');
         return;
     }
 
     if (currentLayer) map.removeLayer(currentLayer);
 
-    const geojson = await fetchDistrict(state, district);
-    
-    if (geojson) {
-        currentDistrict = { state, district };
+    if (district) {
+        const geojson = await fetchDistrict(state, district);
         
-        currentLayer = L.geoJSON(geojson, {
-            style: {
-                fillColor: '#2b6cb0',
-                fillOpacity: 0.3,
-                color: '#1a365d',
-                weight: 2
-            }
-        }).addTo(map);
+        if (geojson) {
+            currentDistrict = { state, district };
+            
+            currentLayer = L.geoJSON(geojson, {
+                style: {
+                    fillColor: '#2b6cb0',
+                    fillOpacity: 0.3,
+                    color: '#1a365d',
+                    weight: 2
+                }
+            }).addTo(map);
 
-        map.fitBounds(currentLayer.getBounds(), { padding: [50, 50] });
-        showMemberInfo(state, district);
+            map.fitBounds(currentLayer.getBounds(), { padding: [50, 50] });
+        } else {
+            alert('District data not available. Try a different selection.');
+        }
     } else {
-        alert('District data not available. Try a different selection.');
+        map.setView([39.8283, -98.5795], 4);
     }
+    
+    showMemberInfo(state, district || null);
 }
 
 async function showMemberInfo(state, district) {
