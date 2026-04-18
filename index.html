@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Congressional District Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            background: #1a365d;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        h1 {
+            font-size: 1.25rem;
+        }
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: auto;
+            align-items: center;
+        }
+        .search-wrapper {
+            position: relative;
+        }
+        #repSearch {
+            width: 200px;
+        }
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #cbd5e0;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1001;
+        }
+        .suggestions.visible {
+            display: block;
+        }
+        .suggestion-item {
+            padding: 0.5rem;
+            cursor: pointer;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .suggestion-item:hover {
+            background: #edf2f7;
+        }
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        .suggestion-name {
+            font-weight: 500;
+            color: #1a365d;
+        }
+        .suggestion-details {
+            font-size: 0.75rem;
+            color: #718096;
+        }
+        .party-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .party-D { background: #3182ce; }
+        .party-R { background: #e53e3e; }
+        .party-I { background: #718096; }
+        select, input {
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #cbd5e0;
+            font-size: 0.875rem;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            background: #2b6cb0;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        button:hover {
+            background: #2c5282;
+        }
+        #map {
+            flex: 1;
+        }
+        .info-panel {
+            position: absolute;
+            top: 80px;
+            right: 10px;
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 250px;
+            display: none;
+        }
+        .info-panel.visible {
+            display: block;
+        }
+        .member-info h2 {
+            font-size: 1rem;
+            color: #1a365d;
+            margin-bottom: 0.5rem;
+        }
+        .member-info p {
+            font-size: 0.875rem;
+            color: #4a5568;
+            margin: 0.25rem 0;
+        }
+        .close-btn {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            color: #718096;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🗳️ Congressional District Map</h1>
+        <div class="controls">
+            <div class="search-wrapper">
+                <input type="text" id="repSearch" placeholder="Search representatives..." autocomplete="off">
+                <div class="suggestions" id="suggestions"></div>
+            </div>
+            <select id="stateSelect">
+                <option value="">Select State</option>
+            </select>
+            <select id="districtSelect" disabled>
+                <option value="">Select District</option>
+            </select>
+            <button id="searchBtn">Search</button>
+        </div>
+    </header>
+    <div id="map"></div>
+    <div class="info-panel" id="infoPanel">
+        <button class="close-btn" id="closePanel">&times;</button>
+        <div class="member-info" id="memberInfo"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
